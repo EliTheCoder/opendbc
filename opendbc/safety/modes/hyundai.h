@@ -3,11 +3,11 @@
 #include "opendbc/safety/declarations.h"
 #include "opendbc/safety/modes/hyundai_common.h"
 
-#define HYUNDAI_LIMITS(steer, rate_up, rate_down) { \
+#define HYUNDAI_LIMITS(steer, rate_up, rate_down, rt_delta) { \
   .max_torque = (steer), \
   .max_rate_up = (rate_up), \
   .max_rate_down = (rate_down), \
-  .max_rt_delta = 112, \
+  .max_rt_delta = (rt_delta), \
   .driver_torque_allowance = 50, \
   .driver_torque_multiplier = 2, \
   .type = TorqueDriverLimited, \
@@ -69,6 +69,7 @@ static const CanMsg HYUNDAI_TX_MSGS[] = {
 };
 
 static bool hyundai_legacy = false;
+static float hyundai_vego = 0.;
 
 static uint8_t hyundai_get_counter(const CANPacket_t *msg) {
 
@@ -192,6 +193,8 @@ static void hyundai_rx_hook(const CANPacket_t *msg) {
       uint32_t front_left_speed = GET_BYTES(msg, 0, 2) & 0x3FFFU;
       uint32_t rear_right_speed = GET_BYTES(msg, 6, 2) & 0x3FFFU;
       vehicle_moving = (front_left_speed > HYUNDAI_STANDSTILL_THRSLD) || (rear_right_speed > HYUNDAI_STANDSTILL_THRSLD);
+      // WHL_SPD_FL: 0.03125 kph/unit, convert to m/s
+      hyundai_vego = (float)front_left_speed * (0.03125f / 3.6f);
     }
 
     if (msg->addr == 0x394U) {
@@ -221,9 +224,12 @@ static void hyundai_rx_hook(const CANPacket_t *msg) {
 }
 
 static bool hyundai_tx_hook(const CANPacket_t *msg) {
-  const TorqueSteeringLimits HYUNDAI_STEERING_LIMITS = HYUNDAI_LIMITS(384, 3, 7);
-  const TorqueSteeringLimits HYUNDAI_STEERING_LIMITS_ALT = HYUNDAI_LIMITS(270, 2, 3);
-  const TorqueSteeringLimits HYUNDAI_STEERING_LIMITS_ALT_2 = HYUNDAI_LIMITS(170, 2, 3);
+  // Low speed (<11 m/s): higher ramp rates safe per ISO 11270 due to low v^2 lateral jerk scaling
+  const TorqueSteeringLimits HYUNDAI_STEERING_LIMITS_LOW_SPEED = HYUNDAI_LIMITS(384, 10, 10, 250);
+  // High speed: rate_up=6 gives 4.63 m/s^3 lateral jerk, within ISO 11270 limit of 5.0 m/s^3
+  const TorqueSteeringLimits HYUNDAI_STEERING_LIMITS = HYUNDAI_LIMITS(384, 6, 7, 150);
+  const TorqueSteeringLimits HYUNDAI_STEERING_LIMITS_ALT = HYUNDAI_LIMITS(270, 2, 3, 112);
+  const TorqueSteeringLimits HYUNDAI_STEERING_LIMITS_ALT_2 = HYUNDAI_LIMITS(170, 2, 3, 112);
 
   bool tx = true;
 
@@ -271,7 +277,8 @@ static bool hyundai_tx_hook(const CANPacket_t *msg) {
     bool steer_req = GET_BIT(msg, 27U);
 
     const TorqueSteeringLimits limits = hyundai_alt_limits_2 ? HYUNDAI_STEERING_LIMITS_ALT_2 :
-                                        hyundai_alt_limits ? HYUNDAI_STEERING_LIMITS_ALT : HYUNDAI_STEERING_LIMITS;
+                                        hyundai_alt_limits ? HYUNDAI_STEERING_LIMITS_ALT :
+                                        (hyundai_vego < 11.0f ? HYUNDAI_STEERING_LIMITS_LOW_SPEED : HYUNDAI_STEERING_LIMITS);
 
     if (steer_torque_cmd_checks(desired_torque, steer_req, limits)) {
       tx = false;

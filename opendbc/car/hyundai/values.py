@@ -17,7 +17,7 @@ class CarControllerParams:
   ACCEL_MIN = -3.5 # m/s
   ACCEL_MAX = 2.0 # m/s
 
-  def __init__(self, CP):
+  def __init__(self, CP, vEgoRaw: float = 100.):
     self.STEER_DELTA_UP = 3
     self.STEER_DELTA_DOWN = 7
     self.STEER_DRIVER_ALLOWANCE = 50
@@ -55,6 +55,13 @@ class CarControllerParams:
     # Default for most HKG
     else:
       self.STEER_MAX = 384
+      # Match panda's speed-dependent ramp rates (hyundai.h)
+      if vEgoRaw < 11.:
+        self.STEER_DELTA_UP = 10
+        self.STEER_DELTA_DOWN = 10
+      else:
+        self.STEER_DELTA_UP = 6
+        self.STEER_DELTA_DOWN = 7
 
 
 class HyundaiSafetyFlags(IntFlag):
