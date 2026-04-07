@@ -77,6 +77,9 @@ class CarController(CarControllerBase, EsccCarController, LeadDataCarController,
     actuators = CC.actuators
     hud_control = CC.hudControl
 
+    # update speed-dependent steering params each frame
+    self.params = CarControllerParams(self.CP, CS.out.vEgoRaw)
+
     # steering torque
     new_torque = int(round(actuators.torque * self.params.STEER_MAX))
     apply_torque = apply_driver_steer_torque_limits(new_torque, self.apply_torque_last, CS.out.steeringTorque, self.params)
