@@ -154,6 +154,9 @@ class CarInterface(CarInterfaceBase):
 
     if candidate == CAR.KIA_OPTIMA_G4_FL_NON_SCC:
       ret.steerActuatorDelay = 0.14
+      # Temporary test override: keep alpha longitudinal available so this
+      # platform can be evaluated for SCC message responsiveness.
+      ret.alphaLongitudinalAvailable = True
 
     # Dashcam cars are missing a test route, or otherwise need validation
     # TODO: Optima Hybrid 2017 uses a different SCC12 checksum
@@ -235,7 +238,7 @@ class CarInterface(CarInterfaceBase):
       communication_control = bytes([uds.SERVICE_TYPE.COMMUNICATION_CONTROL, 0x80 | uds.CONTROL_TYPE.DISABLE_RX_DISABLE_TX, uds.MESSAGE_TYPE.NORMAL])
 
     if CP.openpilotLongitudinalControl and not ((CP.flags & (HyundaiFlags.CANFD_CAMERA_SCC | HyundaiFlags.CAMERA_SCC)) or
-                                                (CP_SP.flags & HyundaiFlagsSP.ENHANCED_SCC)):
+                                                (CP_SP.flags & (HyundaiFlagsSP.ENHANCED_SCC | HyundaiFlagsSP.NON_SCC))):
       addr, bus = 0x7d0, CanBus(CP).ECAN if CP.flags & HyundaiFlags.CANFD else 0
       if CP.flags & HyundaiFlags.CANFD_LKA_STEER_MSG.value:
         addr, bus = 0x730, CanBus(CP).ECAN
