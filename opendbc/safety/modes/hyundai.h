@@ -366,7 +366,8 @@ static safety_config hyundai_init(uint16_t param) {
         SET_RX_CHECKS(hyundai_long_rx_checks, ret);
       }
     }
-    if (hyundai_escc) {
+    if (hyundai_escc || hyundai_non_scc) {
+      // ESCC msgs: SCC11/12/13/14 TX allowed, no radar UDS disable (non-SCC has no radar to disable)
       SET_TX_MSGS(HYUNDAI_LONG_ESCC_TX_MSGS, ret);
     } else if (hyundai_camera_scc) {
       SET_TX_MSGS(HYUNDAI_CAMERA_SCC_LONG_TX_MSGS, ret);
