@@ -195,7 +195,6 @@ class CarInterface(CarInterfaceBase):
     if ret.flags & HyundaiFlagsSP.NON_SCC:
       ret.safetyParam |= HyundaiSafetyFlagsSP.NON_SCC
       if not stock_cp.openpilotLongitudinalControl:
-        stock_cp.alphaLongitudinalAvailable = False
         stock_cp.pcmCruise = True
 
     # untested non-SCC platforms, need user validations
