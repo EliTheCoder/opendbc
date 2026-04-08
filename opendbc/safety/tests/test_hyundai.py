@@ -76,10 +76,10 @@ class TestHyundaiSafety(HyundaiButtonBase, common.CarSafetyTest, common.DriverTo
   RELAY_MALFUNCTION_ADDRS = {0: (0x340, 0x485)}  # LKAS11
   FWD_BLACKLISTED_ADDRS = {2: [0x340, 0x485]}
 
-  MAX_RATE_UP = 10   # low-speed default; panda uses hyundai_vego=0 when no speed messages received
-  MAX_RATE_DOWN = 10
+  MAX_RATE_UP = 3
+  MAX_RATE_DOWN = 7
   MAX_TORQUE_LOOKUP = [0], [384]
-  MAX_RT_DELTA = 250  # sized for rate_up=10 over 250ms RT interval
+  MAX_RT_DELTA = 112
   DRIVER_TORQUE_ALLOWANCE = 50
   DRIVER_TORQUE_FACTOR = 2
 
@@ -225,35 +225,12 @@ class TestHyundaiSafety(HyundaiButtonBase, common.CarSafetyTest, common.DriverTo
     finally:
       self.safety.set_current_safety_param_sp(default_safety_param_sp)
 
-  def test_high_speed_steer_rate_limits(self):
-    """Above 11 m/s, rate_up=6 and rate_down=7 apply (ISO 11270 compliant, 4.63 m/s^3 lateral jerk)."""
-    # 1300 raw WHL_SPD units = ~40.6 kph = ~11.3 m/s, above the 11 m/s threshold
-    HIGH_SPEED_RAW = 1300
-    self._rx(self._speed_msg(HIGH_SPEED_RAW))
-    self.safety.set_controls_allowed(1)
-    self._rx(self._torque_driver_msg(0))
-    self.safety.set_torque_driver(0, 0)
-
-    # rate_up=6 from 0 → 6 should be allowed at high speed
-    self.assertTrue(self._tx(self._torque_cmd_msg(6, steer_req=1)))
-
-    # rate_up=7 from 6 → 13 should be blocked at high speed (rate_up=6 limit)
-    # at low speed this would be allowed since rate_up=10 there
-    self.assertFalse(self._tx(self._torque_cmd_msg(13, steer_req=1)))
-
-    # reset speed to low for subsequent tests
-    self._rx(self._speed_msg(0))
-
 
 @parameterized_class(LDA_BUTTON)
 class TestHyundaiSafetyAltLimits(TestHyundaiSafety):
   MAX_RATE_UP = 2
   MAX_RATE_DOWN = 3
   MAX_TORQUE_LOOKUP = [0], [270]
-  MAX_RT_DELTA = 112
-
-  def test_high_speed_steer_rate_limits(self):
-    raise unittest.SkipTest("ALT_LIMITS cars do not have speed-dependent ramp rates")
 
   @classmethod
   def setUpClass(cls):
@@ -274,10 +251,6 @@ class TestHyundaiSafetyAltLimits2(TestHyundaiSafety):
   MAX_RATE_UP = 2
   MAX_RATE_DOWN = 3
   MAX_TORQUE_LOOKUP = [0], [170]
-  MAX_RT_DELTA = 112
-
-  def test_high_speed_steer_rate_limits(self):
-    raise unittest.SkipTest("ALT_LIMITS_2 cars do not have speed-dependent ramp rates")
 
   @classmethod
   def setUpClass(cls):
