@@ -154,9 +154,6 @@ class CarInterface(CarInterfaceBase):
 
     if candidate == CAR.KIA_OPTIMA_G4_FL_NON_SCC:
       ret.steerActuatorDelay = 0.14
-      # Temporary test override: keep alpha longitudinal available so this
-      # platform can be evaluated for SCC message responsiveness.
-      ret.alphaLongitudinalAvailable = True
 
     # Dashcam cars are missing a test route, or otherwise need validation
     # TODO: Optima Hybrid 2017 uses a different SCC12 checksum
