@@ -162,6 +162,16 @@ class CarController(CarControllerBase, EsccCarController, LeadDataCarController,
           can_sends.extend([hyundaican.create_clu11(self.packer, self.frame, CS.clu11, Buttons.RES_ACCEL, self.CP)] * 25)
           if (self.frame - self.last_button_frame) * DT_CTRL >= 0.15:
             self.last_button_frame = self.frame
+    elif self.CP_SP.flags & HyundaiFlagsSP.NON_SCC:
+      # NON_SCC with openpilot longitudinal: PCM cruise handles gas via button presses;
+      # FCA11 handles braking (see get_fca11_values). Send RES_ACCEL when accel is positive.
+      if CC.cruiseControl.cancel:
+        can_sends.append(hyundaican.create_clu11(self.packer, self.frame, CS.clu11, Buttons.CANCEL, self.CP))
+      elif CC.enabled and accel > 0.05:
+        if (self.frame - self.last_button_frame) * DT_CTRL > 0.1:
+          can_sends.extend([hyundaican.create_clu11(self.packer, self.frame, CS.clu11, Buttons.RES_ACCEL, self.CP)] * 25)
+          if (self.frame - self.last_button_frame) * DT_CTRL >= 0.15:
+            self.last_button_frame = self.frame
 
     if self.frame % 2 == 0 and self.CP.openpilotLongitudinalControl:
       # TODO: unclear if this is needed
