@@ -187,12 +187,19 @@ def create_acc_commands(packer, enabled, accel, upper_jerk, idx, lead_data: CanL
     }
 
   def get_fca11_values():
-    return {
+    values = {
       "CR_FCA_Alive": idx % 0xF,
       "PAINT1_Status": 1,
       "FCA_DrvSetStatus": 1,
       "FCA_Status": 1,
     }
+    if enabled and accel < 0:
+      # CR_VSM_DecCmd: 0.01g/bit, cap at 0.4g (40) to match panda safety limit
+      decel_g = min(abs(accel) / 9.81, 0.4)
+      values["CR_VSM_DecCmd"] = int(round(decel_g / 0.01))
+      values["FCA_CmdAct"] = 1
+      values["CF_VSM_DecCmdAct"] = 1
+    return values
 
   def calculate_fca11_checksum(values):
     fca11_dat = packer.make_can_msg("FCA11", 0, values)[1]

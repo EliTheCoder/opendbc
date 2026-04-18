@@ -680,7 +680,7 @@ class CAR(Platforms):
   KIA_OPTIMA_G4_FL_NON_SCC = HyundaiNonSccPlatformConfig(
     [HyundaiNonSccCarDocs("Kia Optima Non-SCC 2019-20", car_parts=CarParts.common([CarHarness.hyundai_g]))],
     KIA_OPTIMA_G4_FL.specs,
-    flags=HyundaiFlags.TCU_GEARS,
+    flags=HyundaiFlags.TCU_GEARS | HyundaiFlags.USE_FCA,
   )
 
 
