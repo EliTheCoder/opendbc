@@ -190,9 +190,10 @@ class CarInterface(CarInterfaceBase):
       stock_cp.dashcamOnly = False
 
     if ret.flags & HyundaiFlagsSP.NON_SCC:
+      stock_cp.alphaLongitudinalAvailable = False
+      stock_cp.openpilotLongitudinalControl = False
+      stock_cp.pcmCruise = True
       ret.safetyParam |= HyundaiSafetyFlagsSP.NON_SCC
-      if not stock_cp.openpilotLongitudinalControl:
-        stock_cp.pcmCruise = True
 
     # untested non-SCC platforms, need user validations
     if stock_cp.carFingerprint in (CAR.HYUNDAI_BAYON_1ST_GEN_NON_SCC, CAR.KIA_FORTE_2021_NON_SCC,
@@ -232,7 +233,7 @@ class CarInterface(CarInterfaceBase):
       communication_control = bytes([uds.SERVICE_TYPE.COMMUNICATION_CONTROL, 0x80 | uds.CONTROL_TYPE.DISABLE_RX_DISABLE_TX, uds.MESSAGE_TYPE.NORMAL])
 
     if CP.openpilotLongitudinalControl and not ((CP.flags & (HyundaiFlags.CANFD_CAMERA_SCC | HyundaiFlags.CAMERA_SCC)) or
-                                                (CP_SP.flags & (HyundaiFlagsSP.ENHANCED_SCC | HyundaiFlagsSP.NON_SCC))):
+                                                (CP_SP.flags & HyundaiFlagsSP.ENHANCED_SCC)):
       addr, bus = 0x7d0, CanBus(CP).ECAN if CP.flags & HyundaiFlags.CANFD else 0
       if CP.flags & HyundaiFlags.CANFD_LKA_STEER_MSG.value:
         addr, bus = 0x730, CanBus(CP).ECAN

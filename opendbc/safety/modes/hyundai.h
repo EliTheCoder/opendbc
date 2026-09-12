@@ -227,18 +227,13 @@ static bool hyundai_tx_hook(const CANPacket_t *msg) {
 
   bool tx = true;
 
-  // FCA11: Block actuation unless in longitudinal mode (NON_SCC uses this for ESC braking)
+  // FCA11: Block any potential actuation
   if (msg->addr == 0x38DU) {
     int CR_VSM_DecCmd = msg->data[1];
     bool FCA_CmdAct = GET_BIT(msg, 20U);
     bool CF_VSM_DecCmdAct = GET_BIT(msg, 31U);
 
-    bool actuation = (CR_VSM_DecCmd != 0) || FCA_CmdAct || CF_VSM_DecCmdAct;
-    if (actuation && !hyundai_longitudinal) {
-      tx = false;
-    }
-    // Limit decel to 0.4g (40 units at 0.01g/bit), matching HYUNDAI_LONG_LIMITS ~3.5 m/s²
-    if (CR_VSM_DecCmd > 40) {
+    if ((CR_VSM_DecCmd != 0) || FCA_CmdAct || CF_VSM_DecCmdAct) {
       tx = false;
     }
   }
@@ -323,7 +318,6 @@ static safety_config hyundai_init(uint16_t param) {
 
   static const CanMsg HYUNDAI_LONG_ESCC_TX_MSGS[] = {
     HYUNDAI_LONG_COMMON_TX_MSGS(0)
-    {0x38D, 0, 8, .check_relay = false}, // FCA11 Bus 0 (NON_SCC braking via ESC)
   };
 
   hyundai_common_init(param);
@@ -365,8 +359,7 @@ static safety_config hyundai_init(uint16_t param) {
         SET_RX_CHECKS(hyundai_long_rx_checks, ret);
       }
     }
-    if (hyundai_escc || hyundai_non_scc) {
-      // ESCC msgs: SCC11/12/13/14 TX allowed, no radar UDS disable (non-SCC has no radar to disable)
+    if (hyundai_escc) {
       SET_TX_MSGS(HYUNDAI_LONG_ESCC_TX_MSGS, ret);
     } else if (hyundai_camera_scc) {
       SET_TX_MSGS(HYUNDAI_CAMERA_SCC_LONG_TX_MSGS, ret);

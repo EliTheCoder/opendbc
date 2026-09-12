@@ -13,7 +13,6 @@ from opendbc.sunnypilot.car.hyundai.icbm import IntelligentCruiseButtonManagemen
 from opendbc.sunnypilot.car.hyundai.longitudinal.controller import LongitudinalController
 from opendbc.sunnypilot.car.hyundai.lead_data_ext import LeadDataCarController
 from opendbc.sunnypilot.car.hyundai.mads import MadsCarController
-from opendbc.sunnypilot.car.hyundai.values import HyundaiFlagsSP
 
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
 LongCtrlState = structs.CarControl.Actuators.LongControlState
@@ -109,8 +108,7 @@ class CarController(CarControllerBase, EsccCarController, LeadDataCarController,
     # *** common hyundai stuff ***
 
     # tester present - w/ no response (keeps relevant ECU disabled)
-    if self.frame % 100 == 0 and not ((self.CP.flags & HyundaiFlags.CANFD_CAMERA_SCC) or self.ESCC.enabled or
-                                      (self.CP_SP.flags & HyundaiFlagsSP.NON_SCC)) and \
+    if self.frame % 100 == 0 and not ((self.CP.flags & HyundaiFlags.CANFD_CAMERA_SCC) or self.ESCC.enabled) and \
             self.CP.openpilotLongitudinalControl:
       # for longitudinal control, either radar or ADAS driving ECU
       addr, bus = 0x7d0, self.CAN.ECAN if self.CP.flags & HyundaiFlags.CANFD else 0
@@ -170,16 +168,6 @@ class CarController(CarControllerBase, EsccCarController, LeadDataCarController,
         # send resume at a max freq of 10Hz
         if (self.frame - self.last_button_frame) * DT_CTRL > 0.1:
           # send 25 messages at a time to increases the likelihood of resume being accepted
-          can_sends.extend([hyundaican.create_clu11(self.packer, self.frame, CS.clu11, Buttons.RES_ACCEL, self.CP)] * 25)
-          if (self.frame - self.last_button_frame) * DT_CTRL >= 0.15:
-            self.last_button_frame = self.frame
-    elif self.CP_SP.flags & HyundaiFlagsSP.NON_SCC:
-      # NON_SCC with openpilot longitudinal: PCM cruise handles gas via button presses;
-      # FCA11 handles braking (see get_fca11_values). Send RES_ACCEL when accel is positive.
-      if CC.cruiseControl.cancel:
-        can_sends.append(hyundaican.create_clu11(self.packer, self.frame, CS.clu11, Buttons.CANCEL, self.CP))
-      elif CC.enabled and accel > 0.05:
-        if (self.frame - self.last_button_frame) * DT_CTRL > 0.1:
           can_sends.extend([hyundaican.create_clu11(self.packer, self.frame, CS.clu11, Buttons.RES_ACCEL, self.CP)] * 25)
           if (self.frame - self.last_button_frame) * DT_CTRL >= 0.15:
             self.last_button_frame = self.frame
