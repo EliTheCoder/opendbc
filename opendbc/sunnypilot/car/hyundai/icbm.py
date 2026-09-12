@@ -14,15 +14,22 @@ from opendbc.sunnypilot.car.intelligent_cruise_button_management_interface_base 
 ButtonType = structs.CarState.ButtonEvent.Type
 SendButtonState = structs.IntelligentCruiseButtonManagement.SendButtonState
 
-# CLU11 is a 50Hz message, so a single frame asserts the button for ~20ms -- far
-# shorter than a human press (100-300ms) and, measured on a non-SCC Optima, too
-# short for the BCM to latch: 1049 button frames produced zero setpoint changes.
-# The stock resume path in hyundai/carcontroller.py sends 25 frames per press for
-# exactly this reason ("increases the likelihood of resume being accepted").
+# A cruise button used as an *increment* has to be pressed and released, not held.
 #
-# The old interpolation below always collapsed to 1 copy -- np.interp(7, [10, 70],
-# [1, 2]) clamps to the low end -- so the tunable never did anything.
-BUTTON_PRESS_COPIES = 25
+# Measured on a non-SCC Optima across two drives:
+#   1 frame per press   -> 1049 frames, zero setpoint changes. CLU11 is 50Hz, so a
+#                          single frame asserts the button for ~20ms; too short to latch.
+#   25 copies at 10Hz   -> works for sporadic presses, but when the planner wants a
+#                          *sustained* change it emits ~250 frames/s against a 50Hz
+#                          message. The button is then never released, the BCM sees
+#                          one long press and decrements once: 1225 SET_DECEL frames
+#                          over 4s left the setpoint pinned while a lead closed.
+#
+# So emulate a real press: assert the button for PRESS_FRAMES consecutive control
+# frames, then stay silent for RELEASE_FRAMES so the car's own CLU11 (button idle)
+# is seen on the bus, and only then allow the next press.
+PRESS_FRAMES = 15    # 150ms at 100Hz, a human-length press
+RELEASE_FRAMES = 10  # 100ms released, so consecutive presses are distinct events
 
 BUTTONS = {
   SendButtonState.increase: Buttons.RES_ACCEL,
@@ -33,19 +40,23 @@ BUTTONS = {
 class IntelligentCruiseButtonManagementInterface(IntelligentCruiseButtonManagementInterfaceBase):
   def __init__(self, CP, CP_SP):
     super().__init__(CP, CP_SP)
+    self.press_frames_left = 0
+    self.release_frames_left = 0
 
   def create_can_mock_button_messages(self, packer, CS, send_button) -> list[CanData]:
-    can_sends = []
-    copies = BUTTON_PRESS_COPIES
+    # Mid-release: stay off the bus so the BCM sees the button come back up.
+    if self.release_frames_left > 0:
+      return []
 
-    # send resume at a max freq of 10Hz
-    if (self.frame - self.last_button_frame) * DT_CTRL > 0.1:
-      # send 25 messages at a time to increases the likelihood of resume being accepted
-      can_sends.extend([hyundaican.create_clu11(packer, self.frame, CS.clu11, send_button, self.CP)] * copies)
-      if (self.frame - self.last_button_frame) * DT_CTRL >= 0.15:
-        self.last_button_frame = self.frame
+    # Start a new press only once the previous one has been fully released.
+    if self.press_frames_left == 0:
+      self.press_frames_left = PRESS_FRAMES
 
-    return can_sends
+    self.press_frames_left -= 1
+    if self.press_frames_left == 0:
+      self.release_frames_left = RELEASE_FRAMES
+
+    return [hyundaican.create_clu11(packer, self.frame, CS.clu11, send_button, self.CP)]
 
   def create_canfd_mock_button_messages(self, packer, CS, CAN, send_button) -> list[CanData]:
     can_sends = []
@@ -69,6 +80,11 @@ class IntelligentCruiseButtonManagementInterface(IntelligentCruiseButtonManageme
     self.ICBM = CC_SP.intelligentCruiseButtonManagement
     self.frame = frame
     self.last_button_frame = last_button_frame
+
+    # The release countdown has to advance on every frame, not only while a button
+    # is being requested -- otherwise it stalls at idle and delays the next press.
+    if self.release_frames_left > 0:
+      self.release_frames_left -= 1
 
     if self.ICBM.sendButton != SendButtonState.none:
       send_button = BUTTONS[self.ICBM.sendButton]
