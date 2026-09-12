@@ -4,7 +4,6 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
-import numpy as np
 
 from opendbc.car import DT_CTRL, structs
 from opendbc.car.can_definitions import CanData
@@ -15,10 +14,15 @@ from opendbc.sunnypilot.car.intelligent_cruise_button_management_interface_base 
 ButtonType = structs.CarState.ButtonEvent.Type
 SendButtonState = structs.IntelligentCruiseButtonManagement.SendButtonState
 
-BUTTON_COPIES = 2
-BUTTON_COPIES_TIME = 7
-BUTTON_COPIES_TIME_IMPERIAL = [BUTTON_COPIES_TIME + 3, 70]
-BUTTON_COPIES_TIME_METRIC = [BUTTON_COPIES_TIME, 40]
+# CLU11 is a 50Hz message, so a single frame asserts the button for ~20ms -- far
+# shorter than a human press (100-300ms) and, measured on a non-SCC Optima, too
+# short for the BCM to latch: 1049 button frames produced zero setpoint changes.
+# The stock resume path in hyundai/carcontroller.py sends 25 frames per press for
+# exactly this reason ("increases the likelihood of resume being accepted").
+#
+# The old interpolation below always collapsed to 1 copy -- np.interp(7, [10, 70],
+# [1, 2]) clamps to the low end -- so the tunable never did anything.
+BUTTON_PRESS_COPIES = 25
 
 BUTTONS = {
   SendButtonState.increase: Buttons.RES_ACCEL,
@@ -32,8 +36,7 @@ class IntelligentCruiseButtonManagementInterface(IntelligentCruiseButtonManageme
 
   def create_can_mock_button_messages(self, packer, CS, send_button) -> list[CanData]:
     can_sends = []
-    copies_xp = BUTTON_COPIES_TIME_METRIC if CS.is_metric else BUTTON_COPIES_TIME_IMPERIAL
-    copies = int(np.interp(BUTTON_COPIES_TIME, copies_xp, [1, BUTTON_COPIES]))
+    copies = BUTTON_PRESS_COPIES
 
     # send resume at a max freq of 10Hz
     if (self.frame - self.last_button_frame) * DT_CTRL > 0.1:
