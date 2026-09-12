@@ -150,7 +150,10 @@ class CarInterface(CarInterfaceBase):
       ret.steerActuatorDelay = 0.2
 
     if candidate == CAR.KIA_OPTIMA_G4_FL_NON_SCC:
-      ret.steerActuatorDelay = 0.14
+      # lagd measured 0.253s total lateral lag on this car (std 0.014, 50/50 blocks).
+      # lagd's prior is steerActuatorDelay + 0.2, so 0.05 makes the pre-convergence
+      # value match what the car actually measures.
+      ret.steerActuatorDelay = 0.05
 
     # Dashcam cars are missing a test route, or otherwise need validation
     # TODO: Optima Hybrid 2017 uses a different SCC12 checksum
